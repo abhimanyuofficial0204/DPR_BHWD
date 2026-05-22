@@ -38,6 +38,9 @@ def load_data():
     df['Start_Date'] = pd.to_datetime(df['Start_Date'], errors='coerce')
     df['End_Date'] = pd.to_datetime(df['End_Date'], errors='coerce')
     
+    # Completely ignore data before April 2026
+    df = df[df['Start_Date'] >= '2026-04-01']
+    
     # Extract Plant Number from Batch Number (e.g. V-28#0526-416 -> V-28)
     df['Plant_Number'] = df['Batch_Number'].apply(lambda x: str(x).split('#')[0] if '#' in str(x) else 'Unknown')
     
