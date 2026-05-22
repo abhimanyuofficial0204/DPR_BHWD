@@ -1,0 +1,12 @@
+__pycache__/
+*.csv
+*.json
+*.xlsx
+*.pdf
+"GC Data/"
+"Production Data/"
+"New whatsapp download/"
+.DS_Store
+.venv/
+venv/
+env/
