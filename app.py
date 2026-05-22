@@ -262,6 +262,21 @@ with main_tab[0]:
             if selected_batch:
                 df_batch_drums = df_drums[df_drums['Batch_Number'] == selected_batch]
                 
+                # Fetch batch summary metrics from df_filtered
+                batch_info = df_filtered[df_filtered['Batch_Number'] == selected_batch]
+                if not batch_info.empty:
+                    info = batch_info.iloc[0]
+                    start_str = info['Start_Date'].strftime('%d %b %Y, %H:%M') if pd.notna(info['Start_Date']) else 'N/A'
+                    end_str = info['End_Date'].strftime('%d %b %Y, %H:%M') if pd.notna(info['End_Date']) else 'N/A'
+                    
+                    # Highlight metrics in an info box or columns for better readability
+                    m1, m2, m3, m4 = st.columns(4)
+                    m1.metric("Start Date & Time", start_str)
+                    m2.metric("End Date & Time", end_str)
+                    m3.metric("Batch Size (Input)", f"{info['Total_Input_Weight']:.1f} kg")
+                    m4.metric("Output Qty", f"{info['Total_Output_Weight']:.1f} kg")
+                    st.markdown("---")
+                
                 col1, col2 = st.columns(2)
                 
                 with col1:
