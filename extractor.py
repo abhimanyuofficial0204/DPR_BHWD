@@ -43,9 +43,11 @@ def extract_and_upsert_dpr(filepath):
                 col_map[col_name.strip().upper()] = idx
         
         # Find all occurrences of GC columns to handle FEED vs FINAL GC sections
-        lm_cols = [idx for idx, col in enumerate(header_row) if isinstance(col, str) and ('L-MENTHOL' in col.upper() or col.upper() == 'LM')]
-        ma_cols = [idx for idx, col in enumerate(header_row) if isinstance(col, str) and 'MENTHYL ACETATE' in col.upper()]
-        hpt_cols = [idx for idx, col in enumerate(header_row) if isinstance(col, str) and 'HEPTANE' in col.upper()]
+        # We limit to the FIRST occurrence [:1] to prevent accidentally picking up identical column names 
+        # further to the right which are often used for calculated weights or summaries.
+        lm_cols = [idx for idx, col in enumerate(header_row) if isinstance(col, str) and ('L-MENTHOL' in col.upper() or col.upper() == 'LM')][:1]
+        ma_cols = [idx for idx, col in enumerate(header_row) if isinstance(col, str) and 'MENTHYL ACETATE' in col.upper()][:1]
+        hpt_cols = [idx for idx, col in enumerate(header_row) if isinstance(col, str) and 'HEPTANE' in col.upper()][:1]
         
         i = 0
         while i < len(rows):
