@@ -12,28 +12,28 @@ def load_data():
     conn = sqlite3.connect(DB_PATH)
     query = '''
         SELECT 
-            Batch_Number,
-            Process_Type,
-            Start_Date,
-            End_Date,
-            Total_Input_Weight,
-            Total_Output_Weight,
-            Process_Loss_Pct,
-            LM_to_MA_Conversion_Pct,
-            Heptane_Loss_Pct,
-            Initial_LM_Pct,
-            Initial_MA_Pct,
-            Final_LM_Pct,
-            Final_MA_Pct,
-            SOP_Compliant,
-            Deviation_Notes,
-            Source_File
+            Batch_Number, Process_Type, Start_Date, End_Date,
+            Total_Input_Weight, Total_Output_Weight, Process_Loss_Pct,
+            LM_to_MA_Conversion_Pct, Heptane_Loss_Pct,
+            Initial_LM_Pct, Initial_MA_Pct, Final_LM_Pct, Final_MA_Pct,
+            SOP_Compliant, Deviation_Notes, Source_File
         FROM DPR_Master
-        WHERE Source_File LIKE '%GLR%'
         ORDER BY Start_Date DESC
     '''
     df = pd.read_sql_query(query, conn)
+    
+    # Filter by input/output category to explicitly identify Phase 2 batches
+    # (Exclude unrelated natural distillation/reaction batches like P-11, V-02, V-10)
+    phase2_materials = ['DLM', 'VAM', 'NHPT', 'HPT', 'ADH', 'DMM', 'DMS', 'DMR', 'MAI', 'DLI', 'TDM', 'TNS', 'RC']
+    query_drums = "SELECT Batch_Number, Material_Desc FROM Production_Log"
+    df_drums = pd.read_sql_query(query_drums, conn)
     conn.close()
+    
+    # Get all batches that have at least one Phase 2 material in their drums
+    phase2_batches = df_drums[df_drums['Material_Desc'].str.contains('|'.join(phase2_materials), na=False, case=False)]['Batch_Number'].unique()
+    
+    # Keep only batches that use Phase 2 materials
+    df = df[df['Batch_Number'].isin(phase2_batches)]
     
     # Convert dates
     df['Start_Date'] = pd.to_datetime(df['Start_Date'], errors='coerce')
