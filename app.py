@@ -233,8 +233,31 @@ with main_tab[0]:
         if df_drums.empty:
             st.info("No drum data available in the database yet.")
         else:
-            batches = sorted(df_drums['Batch_Number'].unique(), reverse=True)
-            selected_batch = st.selectbox("Select Batch Number", batches)
+            # Create filters using df_filtered which has Process_Type and Start_Date
+            df_batches = df_filtered[['Batch_Number', 'Process_Type', 'Start_Date']].copy()
+            df_batches['Month'] = df_batches['Start_Date'].dt.strftime('%b %Y')
+            
+            f_col1, f_col2 = st.columns(2)
+            with f_col1:
+                processes = ['All'] + sorted(df_batches['Process_Type'].dropna().unique())
+                selected_process = st.selectbox("Filter by Process", processes)
+            with f_col2:
+                # Keep chronological order for months if possible, but unique() mostly preserves it since we sorted earlier
+                months = ['All'] + df_batches['Month'].dropna().unique().tolist()
+                selected_month = st.selectbox("Filter by Month", months)
+                
+            if selected_process != 'All':
+                df_batches = df_batches[df_batches['Process_Type'] == selected_process]
+            if selected_month != 'All':
+                df_batches = df_batches[df_batches['Month'] == selected_month]
+                
+            batches = sorted(df_batches['Batch_Number'].unique(), reverse=True)
+            
+            if not batches:
+                st.warning("No batches match the selected filters.")
+                selected_batch = None
+            else:
+                selected_batch = st.selectbox("Select Batch Number", batches)
             
             if selected_batch:
                 df_batch_drums = df_drums[df_drums['Batch_Number'] == selected_batch]
