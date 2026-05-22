@@ -29,6 +29,7 @@ def load_data():
             Deviation_Notes,
             Source_File
         FROM DPR_Master
+        WHERE Source_File LIKE '%GLR%'
         ORDER BY Start_Date DESC
     '''
     df = pd.read_sql_query(query, conn)
