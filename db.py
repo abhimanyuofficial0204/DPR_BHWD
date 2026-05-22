@@ -56,6 +56,9 @@ def init_db():
             Material_Desc TEXT,
             Drum_Number TEXT,
             Drum_Weight REAL,
+            LM_GC REAL,
+            MA_GC REAL,
+            Heptane_GC REAL,
             Production_Date DATETIME,
             FOREIGN KEY(Batch_Number) REFERENCES DPR_Master(Batch_Number)
         )

@@ -62,7 +62,7 @@ main_tab = st.tabs(["GLR"])
 
 with main_tab[0]:
     # The other tabs should be sub tabs under it
-    sub_tabs = st.tabs(["Overview", "Daily Production Report", "GLR (Enzyme)", "SRP", "Washing"])
+    sub_tabs = st.tabs(["Overview", "Daily Production Report", "GLR (Enzyme)", "SRP", "Washing", "🔍 Drum Explorer"])
     
     with sub_tabs[0]:
         st.header("Phase 2 Overview")
@@ -221,3 +221,46 @@ with main_tab[0]:
         
     with sub_tabs[4]:
         render_detailed_tab('WASHING')
+        
+    with sub_tabs[5]:
+        st.header("🔍 Drum Explorer")
+        st.markdown("View exact drum-by-drum inputs and outputs for any batch.")
+        
+        conn = sqlite3.connect(DB_PATH)
+        df_drums = pd.read_sql_query('SELECT * FROM Production_Log', conn)
+        conn.close()
+        
+        if df_drums.empty:
+            st.info("No drum data available in the database yet.")
+        else:
+            batches = sorted(df_drums['Batch_Number'].unique(), reverse=True)
+            selected_batch = st.selectbox("Select Batch Number", batches)
+            
+            if selected_batch:
+                df_batch_drums = df_drums[df_drums['Batch_Number'] == selected_batch]
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.subheader("📥 Input Drums")
+                    df_in = df_batch_drums[df_batch_drums['Stage'] == 'INPUT'].copy()
+                    if not df_in.empty:
+                        # Clean up for display
+                        df_in_disp = df_in[['Drum_Number', 'Material_Desc', 'Drum_Weight']]
+                        st.dataframe(df_in_disp, use_container_width=True, hide_index=True)
+                        st.markdown(f"**Total Input Weight:** {df_in['Drum_Weight'].sum():.2f} kg")
+                    else:
+                        st.info("No input drums recorded.")
+                        
+                with col2:
+                    st.subheader("📤 Output Drums")
+                    df_out = df_batch_drums[df_batch_drums['Stage'] == 'OUTPUT'].copy()
+                    if not df_out.empty:
+                        # Clean up for display
+                        df_out_disp = df_out[['Drum_Number', 'Material_Desc', 'Drum_Weight', 'LM_GC', 'MA_GC', 'Heptane_GC']]
+                        # Drop columns that are completely empty (e.g., Heptane in Enzyme rxn)
+                        df_out_disp = df_out_disp.dropna(axis=1, how='all') 
+                        st.dataframe(df_out_disp, use_container_width=True, hide_index=True)
+                        st.markdown(f"**Total Output Weight:** {df_out['Drum_Weight'].sum():.2f} kg")
+                    else:
+                        st.info("No output drums recorded.")

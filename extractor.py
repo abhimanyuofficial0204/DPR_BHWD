@@ -146,9 +146,10 @@ def extract_and_upsert_dpr(filepath):
                         
                     # Input drum: Col 0 is desc, Col 3 is weight
                     in_desc = str(dr_row[0 + shift] or '').strip().upper()
+                    in_dr_no = str(dr_row[1 + shift] or '').strip()
                     in_weight = safe_float(dr_row[3 + shift] if 3+shift < len(dr_row) else 0)
                     if in_weight > 0 or in_desc != '':
-                        input_drums.append({'desc': in_desc, 'weight': in_weight})
+                        input_drums.append({'desc': in_desc, 'drum_no': in_dr_no, 'weight': in_weight})
                         
                     # Output drum: Col 11 (or 26) is desc, Col 18 is weight
                     out_weight_val = dr_row[18 + shift] if 18+shift < len(dr_row) else 0
@@ -166,6 +167,12 @@ def extract_and_upsert_dpr(filepath):
                         
                     out_weight = safe_float(out_weight_val)
                     
+                    out_dr_no = ''
+                    if 15+shift < len(dr_row) and dr_row[15+shift]:
+                        out_dr_no = str(dr_row[15+shift]).strip()
+                    elif 11+shift < len(dr_row) and dr_row[11+shift]:
+                        out_dr_no = str(dr_row[11+shift]).strip()
+                    
                     # GC per drum (check all possible columns for the first non-zero value)
                     def get_first_nonzero(row_data, indices, s):
                         for idx in indices:
@@ -181,6 +188,7 @@ def extract_and_upsert_dpr(filepath):
                     if out_weight > 0 or out_desc != '':
                         output_drums.append({
                             'desc': out_desc, 
+                            'drum_no': out_dr_no,
                             'weight': out_weight,
                             'lm_gc': out_lm,
                             'ma_gc': out_ma,
@@ -332,6 +340,19 @@ def extract_and_upsert_dpr(filepath):
                     batch_no, process_type, start_dt, end_dt, final_input, final_output,
                     process_loss_pct, ma_conversion, heptane_loss, initial_lm_pct, initial_ma_pct, final_lm_pct, final_ma_pct, sop_compliant, "\n".join(notes), os.path.basename(filepath)
                 ))
+                
+                # DB Insert Production_Log drums
+                cursor.execute('DELETE FROM Production_Log WHERE Batch_Number = ?', (batch_no,))
+                for d in input_drums:
+                    cursor.execute('''
+                        INSERT INTO Production_Log (Batch_Number, Stage, Material_Desc, Drum_Number, Drum_Weight, Production_Date)
+                        VALUES (?, 'INPUT', ?, ?, ?, ?)
+                    ''', (batch_no, d['desc'], d.get('drum_no', ''), d['weight'], start_dt))
+                for d in output_drums:
+                    cursor.execute('''
+                        INSERT INTO Production_Log (Batch_Number, Stage, Material_Desc, Drum_Number, Drum_Weight, LM_GC, MA_GC, Heptane_GC, Production_Date)
+                        VALUES (?, 'OUTPUT', ?, ?, ?, ?, ?, ?, ?)
+                    ''', (batch_no, d['desc'], d.get('drum_no', ''), d['weight'], d['lm_gc'], d['ma_gc'], d['hpt_gc'], end_dt))
                 
                 i = j
             else:
