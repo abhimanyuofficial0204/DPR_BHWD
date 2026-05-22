@@ -71,8 +71,22 @@ def extract_and_upsert_dpr(filepath):
                                     header_output_weight = safe_float(r_hdr[c_idx + 1])
                                     break
                 
-                start_dt = r1[8 + shift] if isinstance(r1[8 + shift], datetime) else None
-                end_dt = r2[8 + shift] if isinstance(r2[8 + shift], datetime) else None
+                # Dynamically locate Start Date and End Date in the header block
+                start_dt = None
+                end_dt = None
+                
+                for r_hdr in [r1, r2, rows[i+2] if i+2 < len(rows) else []]:
+                    if r_hdr:
+                        for c_idx, cell_val in enumerate(r_hdr):
+                            val_str = str(cell_val).strip().lower()
+                            if 'start date' in val_str and c_idx + 1 < len(r_hdr):
+                                candidate = r_hdr[c_idx + 1]
+                                if isinstance(candidate, datetime):
+                                    start_dt = candidate
+                            elif 'end date' in val_str and c_idx + 1 < len(r_hdr):
+                                candidate = r_hdr[c_idx + 1]
+                                if isinstance(candidate, datetime):
+                                    end_dt = candidate
                 
                 def get_first_nonzero(row_data, indices, s):
                     for idx in indices:
