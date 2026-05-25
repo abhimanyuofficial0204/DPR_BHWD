@@ -93,7 +93,7 @@ export default function EntryPage() {
       
       snap.forEach((doc) => {
         const data = doc.data();
-        fetchedOutputs.append({
+        fetchedOutputs.push({
           drum_no: data.drum_number || "",
           material_desc: data.material_desc || "",
           drum_weight: data.drum_weight || 0,
@@ -169,7 +169,7 @@ export default function EntryPage() {
     const parts = drumRangeInput.split(",");
     
     for (const part of parts) {
-      const trimmed = part.strip();
+      const trimmed = part.trim();
       if (trimmed.includes("to") || trimmed.includes("-")) {
         const subparts = trimmed.split(/to|-/);
         if (subparts.length === 2) {
@@ -185,12 +185,12 @@ export default function EntryPage() {
             const padLen = startMatch[2].length;
             
             for (let i = startNum; i <= endNum; i++) {
-              resolvedDrums.append(`${prefix}${String(i).padStart(padLen, "0")}`);
+              resolvedDrums.push(`${prefix}${String(i).padStart(padLen, "0")}`);
             }
           }
         }
       } else {
-        resolvedDrums.append(trimmed);
+        resolvedDrums.push(trimmed);
       }
     }
     
@@ -206,7 +206,7 @@ export default function EntryPage() {
         const snap = await getDocs(q);
         if (!snap.empty) {
           const match = snap.docs[0].data();
-          loadedInputs.append({
+          loadedInputs.push({
             drum_no: dNo.toUpperCase(),
             material_desc: match.material_desc || "",
             drum_weight: match.drum_weight || "",
@@ -214,7 +214,7 @@ export default function EntryPage() {
             is_traced: true
           });
         } else {
-          loadedInputs.append({
+          loadedInputs.push({
             drum_no: dNo.toUpperCase(),
             material_desc: "",
             drum_weight: "",

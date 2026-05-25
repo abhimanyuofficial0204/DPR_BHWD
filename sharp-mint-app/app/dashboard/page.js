@@ -39,7 +39,7 @@ export default function DashboardPage() {
       const snap = await getDocs(q);
       const list = [];
       snap.forEach((doc) => {
-        list.append({ id: doc.id, ...doc.data() });
+        list.push({ id: doc.id, ...doc.data() });
       });
       setBatches(list);
     } catch (err) {
@@ -74,9 +74,9 @@ export default function DashboardPage() {
       snap.forEach((doc) => {
         const d = doc.data();
         if (d.stage === "INPUT") {
-          inputs.append(d);
+          inputs.push(d);
         } else {
-          outputs.append(d);
+          outputs.push(d);
         }
       });
       
