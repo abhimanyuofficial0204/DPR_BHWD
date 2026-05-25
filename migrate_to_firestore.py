@@ -48,6 +48,24 @@ def safe_float(val, default=0.0):
     except:
         return default
 
+def is_lm_header(col):
+    if not isinstance(col, str):
+        return False
+    s = col.upper().strip()
+    return 'L-MENTHOL' in s or 'L MENTHOL' in s or s == 'LM' or s.startswith('LM ') or s.endswith(' LM') or ' LM ' in s or 'LM(' in s or '(LM)' in s
+
+def is_ma_header(col):
+    if not isinstance(col, str):
+        return False
+    s = col.upper().strip()
+    return 'MENTHYL ACETATE' in s or 'MENTHYL-ACETATE' in s or s == 'MA' or s == 'M.A.' or s == 'M.A' or s.startswith('MA ') or s.endswith(' MA') or ' MA ' in s or 'MA(' in s or '(MA)' in s
+
+def is_hpt_header(col):
+    if not isinstance(col, str):
+        return False
+    s = col.upper().strip()
+    return 'HEPTANE' in s or s == 'HPT' or s == 'H.P.T.' or s == 'H.P.T' or s.startswith('HPT ') or s.endswith(' HPT') or ' HPT ' in s or 'HPT(' in s or '(HPT)' in s
+
 # Extraction logic for Core ID and Plant
 def get_plant_and_core_id(batch_str, default_plant=None):
     if not batch_str or pd.isna(batch_str) or str(batch_str).strip().upper() == 'NONE':
@@ -97,9 +115,9 @@ def migrate_dpr():
         
         # Build column indices map
         header_row = rows[0] if rows else []
-        lm_cols = [idx for idx, col in enumerate(header_row) if isinstance(col, str) and ('L-MENTHOL' in col.upper() or col.upper() == 'LM')][:1]
-        ma_cols = [idx for idx, col in enumerate(header_row) if isinstance(col, str) and 'MENTHYL ACETATE' in col.upper()][:1]
-        hpt_cols = [idx for idx, col in enumerate(header_row) if isinstance(col, str) and 'HEPTANE' in col.upper()][:1]
+        lm_cols = [idx for idx, col in enumerate(header_row) if is_lm_header(col)][:1]
+        ma_cols = [idx for idx, col in enumerate(header_row) if is_ma_header(col)][:1]
+        hpt_cols = [idx for idx, col in enumerate(header_row) if is_hpt_header(col)][:1]
         
         i = 0
         while i < len(rows):
@@ -366,9 +384,9 @@ def migrate_gc_file(filename):
                     field_name = 'feed_gc' if is_feed else 'final_gc'
                     
                     # Ensure LM and MA are mapped to standardized keys
-                    lm_key = next((k for k in gc_data if 'LM' in k.upper() or 'L-MENTHOL' in k.upper()), None)
-                    ma_key = next((k for k in gc_data if 'MENTHYL ACETATE' in k.upper() or 'MA' in k.upper()), None)
-                    hpt_key = next((k for k in gc_data if 'HEPTANE' in k.upper() or 'HPT' in k.upper()), None)
+                    lm_key = next((k for k in gc_data if is_lm_header(k)), None)
+                    ma_key = next((k for k in gc_data if is_ma_header(k)), None)
+                    hpt_key = next((k for k in gc_data if is_hpt_header(k)), None)
                     
                     standard_gc = {}
                     if lm_key: standard_gc['lm_pct'] = gc_data[lm_key]
@@ -506,9 +524,9 @@ def migrate_flavour_fragrance_file(filename, is_flavour=True):
         date_col = next((idx for idx, val in enumerate(header_row) if isinstance(val, str) and 'DATE' in val.upper()), None)
         
         # Chemical compounds GC
-        lm_cols = [idx for idx, val in enumerate(header_row) if isinstance(val, str) and ('LM' in val.upper() or 'L-MENTHOL' in val.upper())]
-        ma_cols = [idx for idx, val in enumerate(header_row) if isinstance(val, str) and 'MENTHYL ACETATE' in val.upper()]
-        hpt_cols = [idx for idx, val in enumerate(header_row) if isinstance(val, str) and 'HEPTANE' in val.upper()]
+        lm_cols = [idx for idx, val in enumerate(header_row) if is_lm_header(val)]
+        ma_cols = [idx for idx, val in enumerate(header_row) if is_ma_header(val)]
+        hpt_cols = [idx for idx, val in enumerate(header_row) if is_hpt_header(val)]
         
         if batch_col is None or weight_col is None:
             continue
@@ -579,9 +597,9 @@ def migrate_mn_mlq():
         desc_col = next((idx for idx, val in enumerate(header_row) if isinstance(val, str) and ('DESC' in val.upper() or 'MATERIAL' in val.upper())), None)
         date_col = next((idx for idx, val in enumerate(header_row) if isinstance(val, str) and 'DATE' in val.upper()), None)
         
-        lm_cols = [idx for idx, val in enumerate(header_row) if isinstance(val, str) and ('LM' in val.upper() or 'L-MENTHOL' in val.upper())]
-        ma_cols = [idx for idx, val in enumerate(header_row) if isinstance(val, str) and 'MENTHYL ACETATE' in val.upper()]
-        hpt_cols = [idx for idx, val in enumerate(header_row) if isinstance(val, str) and 'HEPTANE' in val.upper()]
+        lm_cols = [idx for idx, val in enumerate(header_row) if is_lm_header(val)]
+        ma_cols = [idx for idx, val in enumerate(header_row) if is_ma_header(val)]
+        hpt_cols = [idx for idx, val in enumerate(header_row) if is_hpt_header(val)]
         
         if batch_col is None or weight_col is None:
             continue
@@ -630,7 +648,7 @@ def migrate_mn_mlq():
 if __name__ == "__main__":
     # Execute full migration chain
     print("Starting full Firestore Migration...")
-    migrate_dpr()
+    # migrate_dpr()  # Commented out to avoid wasting daily write quota (already completed)
     migrate_gc_file("GLR-26-27.xlsx")
     migrate_gc_file("RXN-26-27.xlsx")
     migrate_production_logs()
@@ -638,3 +656,4 @@ if __name__ == "__main__":
     migrate_flavour_fragrance_file("FRAGRANCE PROD.-2026-27.xlsx", is_flavour=False)
     migrate_mn_mlq()
     print("Full Migration successfully finished!")
+

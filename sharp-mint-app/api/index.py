@@ -79,6 +79,24 @@ def safe_float(val, default=0.0):
     except:
         return default
 
+def is_lm_header(col):
+    if not isinstance(col, str):
+        return False
+    s = col.upper().strip()
+    return 'L-MENTHOL' in s or 'L MENTHOL' in s or s == 'LM' or s.startswith('LM ') or s.endswith(' LM') or ' LM ' in s or 'LM(' in s or '(LM)' in s
+
+def is_ma_header(col):
+    if not isinstance(col, str):
+        return False
+    s = col.upper().strip()
+    return 'MENTHYL ACETATE' in s or 'MENTHYL-ACETATE' in s or s == 'MA' or s == 'M.A.' or s == 'M.A' or s.startswith('MA ') or s.endswith(' MA') or ' MA ' in s or 'MA(' in s or '(MA)' in s
+
+def is_hpt_header(col):
+    if not isinstance(col, str):
+        return False
+    s = col.upper().strip()
+    return 'HEPTANE' in s or s == 'HPT' or s == 'H.P.T.' or s == 'H.P.T' or s.startswith('HPT ') or s.endswith(' HPT') or ' HPT ' in s or 'HPT(' in s or '(HPT)' in s
+
 # Batch ID clean regex matching: Plant ID + Core ID
 def get_plant_and_core_id(batch_str, default_plant=None):
     if not batch_str or pd.isna(batch_str) or str(batch_str).strip().upper() == 'NONE':
@@ -175,9 +193,9 @@ def process_dpr_file(file_content, filename):
         if not rows: continue
         
         header_row = rows[0]
-        lm_cols = [idx for idx, col in enumerate(header_row) if isinstance(col, str) and ('L-MENTHOL' in col.upper() or col.upper() == 'LM')][:1]
-        ma_cols = [idx for idx, col in enumerate(header_row) if isinstance(col, str) and 'MENTHYL ACETATE' in col.upper()][:1]
-        hpt_cols = [idx for idx, col in enumerate(header_row) if isinstance(col, str) and 'HEPTANE' in col.upper()][:1]
+        lm_cols = [idx for idx, col in enumerate(header_row) if is_lm_header(col)][:1]
+        ma_cols = [idx for idx, col in enumerate(header_row) if is_ma_header(col)][:1]
+        hpt_cols = [idx for idx, col in enumerate(header_row) if is_hpt_header(col)][:1]
         
         i = 0
         while i < len(rows):
@@ -403,9 +421,9 @@ def process_flavour_fragrance_file(file_content, filename):
         desc_col = next((idx for idx, val in enumerate(header_row) if isinstance(val, str) and ('DESC' in val.upper() or 'MATERIAL' in val.upper())), None)
         date_col = next((idx for idx, val in enumerate(header_row) if isinstance(val, str) and 'DATE' in val.upper()), None)
         
-        lm_cols = [idx for idx, val in enumerate(header_row) if isinstance(val, str) and ('LM' in val.upper() or 'L-MENTHOL' in val.upper())]
-        ma_cols = [idx for idx, val in enumerate(header_row) if isinstance(val, str) and 'MENTHYL ACETATE' in val.upper()]
-        hpt_cols = [idx for idx, val in enumerate(header_row) if isinstance(val, str) and 'HEPTANE' in val.upper()]
+        lm_cols = [idx for idx, val in enumerate(header_row) if is_lm_header(val)]
+        ma_cols = [idx for idx, val in enumerate(header_row) if is_ma_header(val)]
+        hpt_cols = [idx for idx, val in enumerate(header_row) if is_hpt_header(val)]
         
         if batch_col is None or weight_col is None:
             continue
@@ -547,9 +565,9 @@ def process_gc_file(file_content, filename):
                     
                     field_name = 'feed_gc' if is_feed else 'final_gc'
                     
-                    lm_key = next((k for k in gc_data if 'LM' in k.upper() or 'L-MENTHOL' in k.upper()), None)
-                    ma_key = next((k for k in gc_data if 'MENTHYL ACETATE' in k.upper() or 'MA' in k.upper()), None)
-                    hpt_key = next((k for k in gc_data if 'HEPTANE' in k.upper() or 'HPT' in k.upper()), None)
+                    lm_key = next((k for k in gc_data if is_lm_header(k)), None)
+                    ma_key = next((k for k in gc_data if is_ma_header(k)), None)
+                    hpt_key = next((k for k in gc_data if is_hpt_header(k)), None)
                     
                     standard_gc = {}
                     if lm_key: standard_gc['lm_pct'] = gc_data[lm_key]
