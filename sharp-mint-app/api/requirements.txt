@@ -1,0 +1,6 @@
+pandas
+openpyxl
+firebase-admin
+fastapi
+python-multipart
+google-cloud-firestore
