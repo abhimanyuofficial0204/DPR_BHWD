@@ -1,6 +1,8 @@
 __pycache__/
 *.csv
 *.json
+!**/package.json
+!**/package-lock.json
 *.xlsx
 *.pdf
 "GC Data/"
@@ -10,3 +12,4 @@ __pycache__/
 .venv/
 venv/
 env/
+
