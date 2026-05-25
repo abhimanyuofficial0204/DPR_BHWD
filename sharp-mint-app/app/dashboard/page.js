@@ -22,6 +22,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterProcess, setFilterProcess] = useState("ALL");
+  const [filterMonth, setFilterMonth] = useState("ALL");
   const [selectedBatch, setSelectedBatch] = useState(null);
   const [selectedBatchDrums, setSelectedBatchDrums] = useState({ inputs: [], outputs: [] });
   const [isLoadingDrums, setIsLoadingDrums] = useState(false);
@@ -34,12 +35,18 @@ export default function DashboardPage() {
       const q = query(
         collection(db, "batches"),
         orderBy("start_date", "desc"),
-        limit(100)
+        limit(500)
       );
       const snap = await getDocs(q);
       const list = [];
+      const April1_2026 = new Date("2026-04-01T00:00:00Z");
+      
       snap.forEach((doc) => {
-        list.push({ id: doc.id, ...doc.data() });
+        const data = doc.data();
+        // Only keep batches that started on or after April 1, 2026
+        if (data.start_date && new Date(data.start_date) >= April1_2026) {
+          list.push({ id: doc.id, ...data });
+        }
       });
       setBatches(list);
     } catch (err) {
@@ -88,6 +95,15 @@ export default function DashboardPage() {
     }
   };
 
+  // Extract unique months for month filter dropdown from loaded batches (which are already filtered to >= April 2026)
+  const uniqueMonths = Array.from(
+    new Set(
+      batches
+        .filter((b) => b.start_date)
+        .map((b) => new Date(b.start_date).toLocaleString("en-US", { month: "long", year: "numeric" }))
+    )
+  ).sort((a, b) => new Date(a) - new Date(b));
+
   // Filter batches
   const filteredBatches = batches.filter((b) => {
     const matchesSearch = b.batch_id.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -95,10 +111,12 @@ export default function DashboardPage() {
     
     const matchesProcess = filterProcess === "ALL" || b.process_type === filterProcess;
     
-    return matchesSearch && matchesProcess;
+    const matchesMonth = filterMonth === "ALL" || (b.start_date && new Date(b.start_date).toLocaleString("en-US", { month: "long", year: "numeric" }) === filterMonth);
+    
+    return matchesSearch && matchesProcess && matchesMonth;
   });
 
-  // Calculate statistics
+  // Calculate statistics (scoped to the April 2026 onwards dataset)
   const enzymeBatches = batches.filter(b => b.process_type === "ENZYME_RXN" && b.enzyme_conversion_pct > 0);
   const avgConversion = enzymeBatches.length > 0 
     ? enzymeBatches.reduce((sum, b) => sum + b.enzyme_conversion_pct, 0) / enzymeBatches.length
@@ -120,6 +138,7 @@ export default function DashboardPage() {
       conversion: b.process_type === "ENZYME_RXN" ? b.enzyme_conversion_pct : null,
       heptaneLoss: b.process_type === "SRP" ? b.heptane_loss_pct : null
     }));
+
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 relative">
@@ -303,6 +322,17 @@ export default function DashboardPage() {
                     </div>
                     
                     <select
+                      value={filterMonth}
+                      onChange={(e) => setFilterMonth(e.target.value)}
+                      className="px-3 py-2 text-xs rounded-xl glass-input bg-black/40"
+                    >
+                      <option value="ALL">All Months</option>
+                      {uniqueMonths.map((m) => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                    </select>
+                    
+                    <select
                       value={filterProcess}
                       onChange={(e) => setFilterProcess(e.target.value)}
                       className="px-3 py-2 text-xs rounded-xl glass-input bg-black/40"
@@ -324,7 +354,9 @@ export default function DashboardPage() {
                         <th className="py-3 px-4">Start Date</th>
                         <th className="py-3 px-4 text-right">Input Weight (kg)</th>
                         <th className="py-3 px-4 text-right">Output Weight (kg)</th>
-                        <th className="py-3 px-4 text-right">Conversion / Loss</th>
+                        <th className="py-3 px-4 text-right">Weight Loss (kg)</th>
+                        <th className="py-3 px-4 text-right">Enzyme Conv (%)</th>
+                        <th className="py-3 px-4 text-right">Hep Loss (%)</th>
                         <th className="py-3 px-4 text-center">Status</th>
                         <th className="py-3 px-4 text-center">Trace</th>
                       </tr>
@@ -357,15 +389,23 @@ export default function DashboardPage() {
                                 </span>
                               </td>
                               <td className="py-3.5 px-4 text-gray-400 flex items-center gap-1.5 text-xs">
-                                <Calendar size={12} />
-                                {batch.start_date ? new Date(batch.start_date).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "N/A"}
+                                  <Calendar size={12} />
+                                  {batch.start_date ? new Date(batch.start_date).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "N/A"}
                               </td>
                               <td className="py-3.5 px-4 text-right font-mono font-semibold">{batch.total_input_weight ? batch.total_input_weight.toFixed(1) : "0.0"}</td>
                               <td className="py-3.5 px-4 text-right font-mono font-semibold">{batch.total_output_weight ? batch.total_output_weight.toFixed(1) : "0.0"}</td>
+                              <td className="py-3.5 px-4 text-right font-mono font-semibold text-gray-400">
+                                {batch.total_input_weight && batch.total_output_weight ? Math.max(0, batch.total_input_weight - batch.total_output_weight).toFixed(1) : "0.0"}
+                              </td>
                               <td className="py-3.5 px-4 text-right font-mono font-bold text-mintGreen">
                                 {batch.process_type === "ENZYME_RXN"
                                   ? (batch.enzyme_conversion_pct > 0 ? `${batch.enzyme_conversion_pct.toFixed(2)}%` : "0.00%")
-                                  : (batch.heptane_loss_pct > 0 ? `${batch.heptane_loss_pct.toFixed(2)}% Loss` : "0.00%")}
+                                  : "-"}
+                              </td>
+                              <td className="py-3.5 px-4 text-right font-mono font-bold text-cyan-400">
+                                {batch.process_type !== "ENZYME_RXN"
+                                  ? (batch.heptane_loss_pct > 0 ? `${batch.heptane_loss_pct.toFixed(2)}%` : "0.00%")
+                                  : "-"}
                               </td>
                               <td className="py-3.5 px-4 text-center">
                                 {isDeviated ? (
@@ -442,48 +482,97 @@ export default function DashboardPage() {
                     <p className="text-gray-400 text-xs">Loading drum details...</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Input Columns */}
-                    <div className="space-y-4">
-                      <h4 className="font-bold text-sm text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
-                        📥 Input Charged
-                      </h4>
-                      {selectedBatchDrums.inputs.length === 0 ? (
-                        <p className="text-xs text-gray-500 italic">No input drums recorded in db.</p>
-                      ) : (
-                        <div className="space-y-3">
-                          {selectedBatchDrums.inputs.map((d, index) => (
-                            <div key={index} className="p-3 bg-white/2 border border-white/5 rounded-xl flex items-center justify-between">
-                              <div>
-                                <p className="text-xs text-gray-500">Drum No.</p>
-                                <p className="text-sm font-semibold text-white font-mono">{d.drum_number}</p>
-                                <p className="text-[10px] text-gray-400 mt-0.5">{d.material_desc}</p>
-                              </div>
-                              <div className="text-right">
-                                <p className="text-xs text-gray-500">Weight</p>
-                                <p className="text-sm font-bold text-mintGreen font-mono">{d.drum_weight.toFixed(1)} kg</p>
-                                {d.origin_batch && (
-                                  <p className="text-[9px] text-gray-400 mt-0.5 font-semibold">Origin: {d.origin_batch}</p>
-                                )}
-                              </div>
-                            </div>
-                          ))}
+                  <div className="space-y-6">
+                    {/* Batch metadata details */}
+                    <div className="bg-white/2 border border-white/5 rounded-xl p-4 space-y-4">
+                      <h3 className="text-sm font-bold text-cyan-400 uppercase tracking-wider">📋 Batch Run Details</h3>
+                      <div className="grid grid-cols-2 gap-4 text-xs">
+                        <div>
+                          <p className="text-gray-500 font-medium">Start Date</p>
+                          <p className="text-white font-semibold">{selectedBatch.start_date ? new Date(selectedBatch.start_date).toLocaleString("en-US") : "N/A"}</p>
                         </div>
-                      )}
+                        <div>
+                          <p className="text-gray-500 font-medium">End Date</p>
+                          <p className="text-white font-semibold">{selectedBatch.end_date ? new Date(selectedBatch.end_date).toLocaleString("en-US") : "N/A"}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-500 font-medium">Total Input Weight</p>
+                          <p className="text-white font-mono font-bold">{selectedBatch.total_input_weight ? selectedBatch.total_input_weight.toLocaleString() : "0"} kg</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-500 font-medium">Total Output Weight</p>
+                          <p className="text-white font-mono font-bold">{selectedBatch.total_output_weight ? selectedBatch.total_output_weight.toLocaleString() : "0"} kg</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-500 font-medium">Weight Loss</p>
+                          <p className="text-red-400 font-mono font-bold">
+                            {selectedBatch.total_input_weight && selectedBatch.total_output_weight ? Math.max(0, selectedBatch.total_input_weight - selectedBatch.total_output_weight).toFixed(1) : "0"} kg
+                            {selectedBatch.total_input_weight > 0 ? ` (${(((selectedBatch.total_input_weight - selectedBatch.total_output_weight)/selectedBatch.total_input_weight) * 100).toFixed(2)}%)` : ""}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-gray-500 font-medium">Process Type</p>
+                          <p className="text-white font-semibold">{selectedBatch.process_type === 'ENZYME_RXN' ? 'GLR Enzyme Reaction' : selectedBatch.process_type === 'SRP' ? 'Solvent Recovery (SRP)' : 'Neutralizing & Washing'}</p>
+                        </div>
+                      </div>
                     </div>
 
-                    {/* Output Columns */}
-                    <div className="space-y-4">
-                      <h4 className="font-bold text-sm text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
-                        📤 Output Produced
-                      </h4>
-                      {selectedBatchDrums.outputs.length === 0 ? (
-                        <p className="text-xs text-gray-500 italic">No output drums recorded in db.</p>
-                      ) : (
-                        <div className="space-y-3">
-                          {selectedBatchDrums.outputs.map((d, index) => (
-                            <div key={index} className="p-3 bg-white/2 border border-white/5 rounded-xl space-y-2">
-                              <div className="flex items-center justify-between">
+                    {/* Feed vs Final GC values */}
+                    <div className="bg-white/2 border border-white/5 rounded-xl p-4 space-y-3">
+                      <h3 className="text-sm font-bold text-cyan-400 uppercase tracking-wider">🔬 GC Analysis (Feed vs Final)</h3>
+                      <table className="w-full text-xs text-left border-collapse">
+                        <thead>
+                          <tr className="border-b border-white/5 text-gray-500">
+                            <th className="pb-1.5">Component</th>
+                            <th className="pb-1.5 text-right">Feed %</th>
+                            <th className="pb-1.5 text-right">Final %</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/5">
+                          <tr>
+                            <td className="py-1.5 text-white">L-Menthol (LM)</td>
+                            <td className="py-1.5 text-right font-mono text-gray-400">
+                              {selectedBatch.feed_gc?.lm_pct !== undefined ? `${selectedBatch.feed_gc.lm_pct.toFixed(2)}%` : "N/A"}
+                            </td>
+                            <td className="py-1.5 text-right font-mono font-bold text-mintGreen">
+                              {selectedBatch.final_gc?.lm_pct !== undefined ? `${selectedBatch.final_gc.lm_pct.toFixed(2)}%` : "N/A"}
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="py-1.5 text-white">Menthyl Acetate (MA)</td>
+                            <td className="py-1.5 text-right font-mono text-gray-400">
+                              {selectedBatch.feed_gc?.ma_pct !== undefined ? `${selectedBatch.feed_gc.ma_pct.toFixed(2)}%` : "N/A"}
+                            </td>
+                            <td className="py-1.5 text-right font-mono font-bold text-mintGreen">
+                              {selectedBatch.final_gc?.ma_pct !== undefined ? `${selectedBatch.final_gc.ma_pct.toFixed(2)}%` : "N/A"}
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="py-1.5 text-white">Heptane (Hpt)</td>
+                            <td className="py-1.5 text-right font-mono text-gray-400">
+                              {selectedBatch.feed_gc?.heptane_pct !== undefined ? `${selectedBatch.feed_gc.heptane_pct.toFixed(2)}%` : "N/A"}
+                            </td>
+                            <td className="py-1.5 text-right font-mono font-bold text-cyan-400">
+                              {selectedBatch.final_gc?.heptane_pct !== undefined ? `${selectedBatch.final_gc.heptane_pct.toFixed(2)}%` : "N/A"}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Drum lists layout */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Input Columns */}
+                      <div className="space-y-4">
+                        <h4 className="font-bold text-sm text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
+                          📥 Input Charged
+                        </h4>
+                        {selectedBatchDrums.inputs.length === 0 ? (
+                          <p className="text-xs text-gray-500 italic">No input drums recorded in db.</p>
+                        ) : (
+                          <div className="space-y-3">
+                            {selectedBatchDrums.inputs.map((d, index) => (
+                              <div key={index} className="p-3 bg-white/2 border border-white/5 rounded-xl flex items-center justify-between">
                                 <div>
                                   <p className="text-xs text-gray-500">Drum No.</p>
                                   <p className="text-sm font-semibold text-white font-mono">{d.drum_number}</p>
@@ -492,19 +581,50 @@ export default function DashboardPage() {
                                 <div className="text-right">
                                   <p className="text-xs text-gray-500">Weight</p>
                                   <p className="text-sm font-bold text-mintGreen font-mono">{d.drum_weight.toFixed(1)} kg</p>
+                                  {d.origin_batch && (
+                                    <p className="text-[9px] text-gray-400 mt-0.5 font-semibold">Origin: {d.origin_batch}</p>
+                                  )}
                                 </div>
                               </div>
-                              {/* Display GC scores per drum if exist */}
-                              {(d.lm_gc > 0 || d.ma_gc > 0) && (
-                                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/5 text-[10px] text-gray-400">
-                                  <div>LM: <span className="text-white font-mono font-semibold">{d.lm_gc.toFixed(2)}%</span></div>
-                                  <div>MA: <span className="text-white font-mono font-semibold">{d.ma_gc.toFixed(2)}%</span></div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Output Columns */}
+                      <div className="space-y-4">
+                        <h4 className="font-bold text-sm text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
+                          📤 Output Produced
+                        </h4>
+                        {selectedBatchDrums.outputs.length === 0 ? (
+                          <p className="text-xs text-gray-500 italic">No output drums recorded in db.</p>
+                        ) : (
+                          <div className="space-y-3">
+                            {selectedBatchDrums.outputs.map((d, index) => (
+                              <div key={index} className="p-3 bg-white/2 border border-white/5 rounded-xl space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <p className="text-xs text-gray-500">Drum No.</p>
+                                    <p className="text-sm font-semibold text-white font-mono">{d.drum_number}</p>
+                                    <p className="text-[10px] text-gray-400 mt-0.5">{d.material_desc}</p>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="text-xs text-gray-500">Weight</p>
+                                    <p className="text-sm font-bold text-mintGreen font-mono">{d.drum_weight.toFixed(1)} kg</p>
+                                  </div>
                                 </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                                {/* Display GC scores per drum if exist */}
+                                {(d.lm_gc > 0 || d.ma_gc > 0) && (
+                                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/5 text-[10px] text-gray-400">
+                                    <div>LM: <span className="text-white font-mono font-semibold">{d.lm_gc.toFixed(2)}%</span></div>
+                                    <div>MA: <span className="text-white font-mono font-semibold">{d.ma_gc.toFixed(2)}%</span></div>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
