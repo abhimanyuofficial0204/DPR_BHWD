@@ -347,7 +347,7 @@ export default function EntryPage() {
       await setDoc(doc(db, "batches", key), batchObj);
 
       // 2. Write input drums
-      for (let idx, d of inputDrums.entries()) {
+      for (let [idx, d] of inputDrums.entries()) {
         const drumKey = `${key}_INPUT_${d.drum_no || `drum_${idx}`}`.replace(/\//g, "-").replace(/#/g, "_");
         await setDoc(doc(db, "drums", drumKey), {
           batch_id: key,
@@ -360,7 +360,7 @@ export default function EntryPage() {
       }
 
       // 3. Write output drums
-      for (let idx, d of outputDrums.entries()) {
+      for (let [idx, d] of outputDrums.entries()) {
         const drumKey = `${key}_OUTPUT_${d.drum_no || `drum_${idx}`}`.replace(/\//g, "-").replace(/#/g, "_");
         await setDoc(doc(db, "drums", drumKey), {
           batch_id: key,
